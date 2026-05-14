@@ -1,79 +1,57 @@
-import os
-import io
+from flask import Flask, render_template, request, jsonify
+from ultralytics import YOLO
 import cv2
 import numpy as np
-from flask import Flask, request, send_file
-from ultralytics import YOLO
-from PIL import Image
+import base64
 
 app = Flask(__name__)
 
-# Load the model once when the app starts
+# --- LOAD MODEL ---
+# Loads once when the server starts (equivalent to @st.cache_resource)
 model = YOLO('best.pt')
 
-# 1. Provide a simple HTML upload page
-@app.route('/', methods=['GET'])
+@app.route('/')
 def index():
-    return '''
-    <!doctype html>
-    <html lang="en">
-    <head>
-      <title>Plant Disease Detection</title>
-      <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f9f4; text-align: center; padding-top: 50px; }
-        .container { background: white; padding: 30px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h2 { color: #2e7d32; }
-        input[type="submit"] { background-color: #4caf50; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h2>🌿 Plant Disease Detector</h2>
-        <p>Upload a suspected plant leaf image.</p>
-        <form method="post" action="/predict" enctype="multipart/form-data">
-          <input type="file" name="file" accept=".jpg, .jpeg, .png" required>
-          <br><br>
-          <input type="submit" value="Analyze Leaf">
-        </form>
-      </div>
-    </body>
-    </html>
-    '''
+    return render_template('index.html')
 
-# 2. Handle the image upload and run YOLO inference
-@app.route('/predict', methods=['POST'])
-def predict():
+@app.route('/detect', methods=['POST'])
+def detect():
     if 'file' not in request.files:
-        return "No file uploaded", 400
+        return jsonify({'error': 'No file uploaded'}), 400
     
     file = request.files['file']
     if file.filename == '':
-        return "No file selected", 400
+        return jsonify({'error': 'No file selected'}), 400
 
-    if file:
-        # Read the image
-        image_bytes = file.read()
-        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    # Read image into OpenCV format
+    img_bytes = file.read()
+    nparr = np.frombuffer(img_bytes, np.uint8)
+    image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        # Run YOLO prediction
-        results = model.predict(source=img, conf=0.45)
-        
-        # Plot the bounding boxes
-        res_plotted = results[0].plot(line_width=3)
-        
-        # Convert BGR (OpenCV format) to RGB (PIL format)
-        res_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
-        res_img = Image.fromarray(res_rgb)
+    # Inference (Exactly as Streamlit logic)
+    results = model.predict(source=image, conf=0.45)
+    res_plotted = results[0].plot(line_width=3)
+    
+    # Encode plotted image to base64 so HTML can display it
+    # Note: OpenCV naturally encodes BGR to proper JPG format, so BGR2RGB conversion is not needed here
+    _, buffer = cv2.imencode('.jpg', res_plotted)
+    encoded_img = base64.b64encode(buffer).decode('utf-8')
 
-        # Save the result to memory to send back to the browser
-        img_io = io.BytesIO()
-        res_img.save(img_io, 'JPEG', quality=90)
-        img_io.seek(0)
+    # Status / Box Extraction logic
+    num_boxes = len(results[0].boxes)
+    detections = []
+    
+    if num_boxes > 0:
+        for box in results[0].boxes:
+            label = model.names[int(box.cls[0])]
+            conf = float(box.conf[0])
+            detections.append({'label': label, 'conf': conf})
 
-        # Send the image to the user
-        return send_file(img_io, mimetype='image/jpeg')
+    return jsonify({
+        'image': encoded_img,
+        'num_boxes': num_boxes,
+        'detections': detections
+    })
 
 if __name__ == '__main__':
-    # Bind to the port provided by Render, or default to 5000 locally
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(debug=True, use_reloader=False, port=5000)
