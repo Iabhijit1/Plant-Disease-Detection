@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plant Disease Detection System</title>
+    <style>
+        /* --- CORE PAGE STYLING MATCHING STREAMLIT --- */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f4f9f4; /* Main background color */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif, Arial;
+        }
+
+        /* --- CUSTOM HEADER UI EXACT COPY --- */
+        header {
+            background: linear-gradient(135deg, #2e7d32, #4caf50);
+            color: white;
+            padding: 2rem;
+            position: relative;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 0 0 15px 15px;
+        }
+        .university-name {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            background-color: #e3f2fd;
+            color: #1565c0;
+            padding: 6px 16px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            white-space: nowrap;
+        }
+        h1 { font-size: 2.5rem; margin-bottom: 10px; margin-top: 30px; }
+        h2 { font-size: 1.2rem; font-weight: 400; margin-bottom: 15px; color: #e8f5e9; }
+        .credits {
+            font-size: 1rem; font-style: italic; background-color: #ffecb3; color: #5d4037;
+            display: inline-block; padding: 8px 20px; border-radius: 20px; font-weight: 600;
+            border: 1px solid #ffe082; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        @media (max-width: 768px) {
+            .university-name { position: static; transform: none; margin-bottom: 15px; display: inline-block; }
+        }
+
+        /* --- MAIN LAYOUT --- */
+        .container { max-width: 1300px; margin: 0 auto; padding: 2rem; }
+        .columns { display: flex; gap: 2rem; flex-wrap: wrap; margin-top: 1rem; }
+        .column {
+            flex: 1; min-width: 350px; background: white; border-radius: 12px;
+            padding: 2rem; box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+        }
+
+        /* --- PANEL TITLES STYLING --- */
+        h3 {
+            color: #2e7d32 !important;
+            border-bottom: 2px solid #a5d6a7;
+            padding-bottom: 5px;
+            text-align: center;
+            font-size: 1.5rem !important;
+            margin-bottom: 1.5rem !important;
+            margin-top: 0;
+        }
+
+        /* --- INPUT & BUTTON STYLING MATCHING STREAMLIT --- */
+        input[type="file"] {
+            display: block; width: 100%; margin-bottom: 15px; cursor: pointer;
+            padding: 10px; border: 1px dashed #a5d6a7; border-radius: 4px; background: #fafafa;
+        }
+        
+        .stButton-btn {
+            background-color: #4caf50; color: white; border: none; padding: 15px 20px;
+            font-size: 1.1rem; border-radius: 8px; transition: background-color 0.3s ease, transform 0.1s ease;
+            width: 100%; font-weight: 600; display: flex; justify-content: center; align-items: center; cursor: pointer;
+        }
+        .stButton-btn:hover { background-color: #388e3c; color: white; }
+        .stButton-btn:active { transform: scale(0.98); }
+
+        /* Helpers & Placeholders */
+        .preview-box { border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-top: 15px; text-align: center;}
+        img { max-width: 100%; border-radius: 5px; }
+        
+        .awaiting-box {
+            border: 2px dashed #ccc; border-radius: 8px; width: 100%; height: 250px;
+            display: flex; justify-content: center; align-items: center;
+            background-color: #fafafa; color: #2e7d32;
+        }
+
+        #camera-feed { margin-top: 10px; display: none; width: 100%; border-radius: 8px; border: 1px solid #ccc; }
+        .capture-btn { margin-top: 10px; background: #eef; border: 1px solid #ccc; padding: 8px; border-radius: 5px; cursor: pointer; width: 100%; display: none; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="university-name">Dibrugarh University</div>
+        <h1>Plant Disease Detection System</h1>
+        <h2>Department of Computer Science and Engineering</h2>
+        <div class="credits">Model developed by Abhijit Saikia and Artina Bora</div>
+    </header>
+
+    <div class="container">
+        <div class="columns">
+            
+            <!-- COLUMN 1: Input -->
+            <div class="column">
+                <h3>Suspected Plant Leaf</h3>
+                
+                <p style='font-family: Arial; color: #2e7d32; margin-bottom: 5px;'>Upload from Device:</p>
+                <input type="file" id="file-upload" accept="image/jpeg, image/png, image/jpg">
+                
+                <p style='text-align: center; color: #a5d6a7; font-weight: bold;'>— OR —</p>
+                
+                <p style='font-family: Arial; color: #2e7d32; margin-bottom: 5px;'>Camera :</p>
+                <label style="cursor: pointer;">
+                    <input type="checkbox" id="camera-toggle"> Open Camera
+                </label>
+                
+                <video id="camera-feed" autoplay></video>
+                <button id="capture-btn" class="capture-btn">Take a photo of the leaf</button>
+                <canvas id="canvas" style="display:none;"></canvas>
+
+                <div id="preview-container" class="preview-box" style="display: none;">
+                    <p style="color:#555; margin-bottom: 5px; font-size:0.9rem;">Selected Sample</p>
+                    <img id="preview-img" src="" width="250">
+                </div>
+            </div>
+
+            <!-- COLUMN 2: Output -->
+            <div class="column">
+                <h3>Detection Results</h3>
+                
+                <!-- Awaiting input container -->
+                <div id="awaiting-container" class="awaiting-box">
+                    <p>Awaiting Image Input...</p>
+                </div>
+
+                <!-- Active results container (Hidden initially, matching logic of 'if input_image is not None:') -->
+                <div id="active-container" style="display: none;">
+                    <br>
+                    <button id="detect-btn" class="stButton-btn">Detect</button>
+                    <p id="spinner" style="display:none; color: #555; text-align: center; margin-top:10px;">Analyzing Leaf Features...</p>
+                    
+                    <div id="result-wrapper" style="margin-top: 15px; display: none;">
+                        <img id="analyzed-img" src="">
+                        <div id="status-message"></div>
+                        <div id="badges-container"></div>
+                    </div>
+                </div>
+                
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Frontend Logic script exactly mimicking Streamlit logic block -->
+    <script>
+        let currentFile = null;
+
+        // Elements
+        const fileUpload = document.getElementById('file-upload');
+        const cameraToggle = document.getElementById('camera-toggle');
+        const cameraFeed = document.getElementById('camera-feed');
+        const captureBtn = document.getElementById('capture-btn');
+        const canvas = document.getElementById('canvas');
+        
+        const previewContainer = document.getElementById('preview-container');
+        const previewImg = document.getElementById('preview-img');
+        const awaitingContainer = document.getElementById('awaiting-container');
+        const activeContainer = document.getElementById('active-container');
+        
+        let stream = null;
+
+        // --- Logic: Reveal Right Column Button when an Image is Provided ---
+        function checkInputReady() {
+            if (currentFile) {
+                awaitingContainer.style.display = 'none';
+                activeContainer.style.display = 'block';
+                previewContainer.style.display = 'block';
+            }
+        }
+
+        // --- Upload Event ---
+        fileUpload.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                currentFile = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    previewImg.src = event.target.result;
+                    checkInputReady();
+                };
+                reader.readAsDataURL(currentFile);
+            }
+        });
+
+        // --- Camera Toggle Event ---
+        cameraToggle.addEventListener('change', async (e) => {
+            if (e.target.checked) {
+                cameraFeed.style.display = 'block';
+                captureBtn.style.display = 'block';
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    cameraFeed.srcObject = stream;
+                } catch (err) {
+                    alert('Camera access denied or unavailable.');
+                    e.target.checked = false;
+                }
+            } else {
+                cameraFeed.style.display = 'none';
+                captureBtn.style.display = 'none';
+                if (stream) stream.getTracks().forEach(track => track.stop());
+            }
+        });
+
+        // --- Capture Event ---
+        captureBtn.addEventListener('click', () => {
+            canvas.width = cameraFeed.videoWidth;
+            canvas.height = cameraFeed.videoHeight;
+            canvas.getContext('2d').drawImage(cameraFeed, 0, 0);
+            
+            canvas.toBlob((blob) => {
+                currentFile = blob;
+                previewImg.src = URL.createObjectURL(blob);
+                checkInputReady();
+            }, 'image/jpeg');
+        });
+
+        // --- Detect (Submit) Event ---
+        document.getElementById('detect-btn').addEventListener('click', async () => {
+            if (!currentFile) return;
+
+            document.getElementById('spinner').style.display = 'block';
+            document.getElementById('result-wrapper').style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('file', currentFile, 'sample.jpg');
+
+            try {
+                const response = await fetch('/detect', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                document.getElementById('spinner').style.display = 'none';
+                document.getElementById('result-wrapper').style.display = 'block';
+                
+                // Show Image
+                document.getElementById('analyzed-img').src = 'data:image/jpeg;base64,' + data.image;
+
+                // --- DYNAMIC STATUS COLOR LOGIC (Exact Match) ---
+                let statusColor = "";
+                let statusMsg = "";
+                
+                if (data.num_boxes > 0) {
+                    statusColor = "#e53935"; // RED text for detections
+                    statusMsg = `Detections Confirmed: ${data.num_boxes} instances found.`;
+                } else {
+                    statusColor = "#2e7d32"; // GREEN text for no detections
+                    statusMsg = "No diseases detected. The plant appears healthy.";
+                }
+
+                document.getElementById('status-message').innerHTML = `
+                    <p style='color: ${statusColor}; font-weight: bold; font-size: 1.1rem; margin-top: 15px; margin-bottom: 5px;'>
+                        ${statusMsg}
+                    </p>
+                `;
+
+                // Render individual detection badges
+                let badgesHtml = "";
+                if (data.num_boxes > 0) {
+                    data.detections.forEach(det => {
+                        let confPct = (det.conf * 100).toFixed(2) + "%";
+                        badgesHtml += `
+                            <div style='background-color: #fbe9e7; border-left: 5px solid #d32f2f; color: #b71c1c; padding: 15px; border-radius: 4px; width: 100%; text-align: center; font-size: 1.2rem; font-weight: bold; margin-top: 10px; box-sizing:border-box;'>
+                                Identified: <b>${det.label.toUpperCase()}</b> <br> 
+                                <span style='font-size: 0.9rem; color: #555;'>Accuracy: ${confPct}</span>
+                            </div>
+                        `;
+                    });
+                }
+                document.getElementById('badges-container').innerHTML = badgesHtml;
+
+            } catch (error) {
+                console.error(error);
+                document.getElementById('spinner').style.display = 'none';
+                alert('An error occurred during inference.');
+            }
+        });
+    </script>
+</body>
+</html>
